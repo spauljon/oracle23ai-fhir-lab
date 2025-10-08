@@ -35,6 +35,10 @@ coverage/
 *.swo
 *~
 
+# project-specific
+fhir/resources/
+
+
 # OS generated files
 .DS_Store
 .DS_Store?
