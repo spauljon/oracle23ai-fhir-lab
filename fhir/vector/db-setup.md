@@ -25,7 +25,7 @@ grant execute on ctxsys.ctx_output  to fhir_vec;
 ```
 
 ### Create Sidecar Tables
-#### Create Observation Vector Table
+#### Create Active (Hot) Observation Vector Table - unpartitioned + ANN index
 ```sql
 create table fhir_vec.obs_vec_active (
   observation_id     varchar2(64) primary key,
@@ -64,4 +64,33 @@ on fhir_vec.obs_vec_active (embedding)
 organization neighbor partitions
 distance cosine
 parameters (type ivf, neighbor partitions 512);
+```
+
+#### Create History (Cold) Observation Vector Table - partitioned, no ANN index (exact scoring + pruning)
+```sql
+create table fhir_vec.obs_vec_hist (
+  observation_id     varchar2(64) primary key,
+  patient_id         varchar2(64) not null,
+  effective_instant  timestamp    not null,
+  code_text          varchar2(256),
+  value_text         varchar2(128),
+  display_text       clob         not null,
+  embedding          vector(1536) not null,
+  model_name         varchar2(64),
+  model_version      varchar2(32),
+  text_sha256        varchar2(64),
+  created_at         timestamp default systimestamp
+)
+partition by range (effective_instant)
+interval (numtoyminterval(1,'month')) (
+  partition p0 values less than (date '2025-01-01')
+);
+
+create index fhir_vec.idx_obs_hist_patient on fhir_vec.obs_vec_hist (patient_id) local;
+create index fhir_vec.idx_obs_hist_effective on fhir_vec.obs_vec_hist (effective_instant) local;
+
+create index fhir_vec.obs_hist_ctx
+  on fhir_vec.obs_vec_hist(display_text)
+  indextype is ctxsys.context
+  parameters('LEXER OTX_LEXER STOPLIST OTX_STOPLIST SYNC (MANUAL)');
 ```
