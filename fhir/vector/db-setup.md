@@ -27,66 +27,63 @@ grant execute on ctxsys.ctx_output  to fhir_vec;
 ### Create Sidecar Tables
 #### Create Active (Hot) Observation Vector Table - unpartitioned + ANN index
 ```sql
+-- ---------- Table ----------
 create table fhir_vec.obs_vec_active (
-  observation_id     varchar2(64) primary key,
-  patient_id         varchar2(64) not null,
-  effective_start    timestamp with time zone not null,
-  effective_end      timestamp with time zone not null,
-  code_text          varchar2(256),
-  value_text         varchar2(128),
-  display_text       clob         not null,  
-  embedding          vector(1536) not null, 
-  model_name         varchar2(64),
-  model_version      varchar2(32),
-  text_sha256        varchar2(64),
-  created_at         timestamp default systimestamp
+  id                number generated always as identity primary key,  -- surrogate pk
+  observation_id    varchar2(64)      not null,                       -- logical key (fhir observation.id)
+  patient_id        varchar2(64)      not null,
+  effective_start   timestamp with time zone not null,
+  effective_end     timestamp with time zone not null,
+  code_text         varchar2(256),
+  value_text        varchar2(128),
+  display_text      clob             not null,                        -- text for oracle text (lexical) search
+  embedding         vector(1536)     not null,                        -- semantic vector
+  text_sha256       varchar2(64),                                      -- hash of display_text (or full text) for dedupe
+  created_at        timestamp default systimestamp
 );
 
-create index fhir_vec.idx_obs_act_patient   on fhir_vec.obs_vec_active (patient_id);
-create index fhir_vec.idx_obs_act_effective on fhir_vec.obs_vec_active (effective_instant);
--- add unique index on the pk and hash to prevent duplicates
-create unique index uq_obs_vec_active_sha256
-    on fhir_vec.obs_vec_active (observation_id, text_sha256);
+-- ---------- B-tree indexes ----------
+create index fhir_vec.idx_obs_act_patient
+  on fhir_vec.obs_vec_active (patient_id);
 
--- oracle text preferences (basic)
--- n.b.  you must connect as fhir_vec to execute this block
+create index fhir_vec.idx_obs_act_effective
+  on fhir_vec.obs_vec_active (effective_start, effective_end);
+
+create unique index fhir_vec.uq_obs_vec_active_sha256
+  on fhir_vec.obs_vec_active (observation_id, text_sha256);
+
 begin
   ctxsys.ctx_ddl.create_preference('OTX_LEXER', 'BASIC_LEXER');
   ctxsys.ctx_ddl.create_stoplist('OTX_STOPLIST', 'BASIC_STOPLIST');
 end;
-/
 
--- oracle text index (lexical search on display_text)
 create index fhir_vec.obs_act_ctx
   on fhir_vec.obs_vec_active(display_text)
   indextype is ctxsys.context
   parameters('LEXER OTX_LEXER STOPLIST OTX_STOPLIST SYNC (ON COMMIT)');
 
--- vector ann index (semantic). tune lists later.
 create vector index fhir_vec.obs_act_ivf
-on fhir_vec.obs_vec_active (embedding)
-organization neighbor partitions
-distance cosine
-parameters (type ivf, neighbor partitions 512);
+  on fhir_vec.obs_vec_active (embedding)
+  organization neighbor partitions
+  distance cosine
+  parameters (TYPE IVF, NEIGHBOR PARTITIONS 512);
 ```
 
 #### Create History (Cold) Observation Vector Table - partitioned, no ANN index (exact scoring + pruning)
 ```sql
 create table fhir_vec.obs_vec_hist (
-  observation_id     varchar2(64) primary key,
-  patient_id         varchar2(64) not null,
-  effective_start    timestamp with time zone not null,
-  effective_end      timestamp with time zone not null,
-  effective_utc TIMESTAMP
-      GENERATED ALWAYS AS (SYS_EXTRACT_UTC(effective_start)) VIRTUAL,
-  code_text          varchar2(256),
-  value_text         varchar2(128),
-  display_text       clob         not null,
-  embedding          vector(1536) not null,
-  model_name         varchar2(64),
-  model_version      varchar2(32),
-  text_sha256        varchar2(64),
-  created_at         timestamp default systimestamp
+  id                number primary key,  
+  observation_id    varchar2(64)      not null,                       -- logical key (fhir observation.id)
+  patient_id        varchar2(64)      not null,
+  effective_start   timestamp with time zone not null,
+  effective_end     timestamp with time zone not null,
+  effective_utc timestamp generated always as (sys_extract_utc(effective_start)) virtual,
+  code_text         varchar2(256),
+  value_text        varchar2(128),
+  display_text      clob             not null,                        -- text for oracle text (lexical) search
+  embedding         vector(1536)     not null,                        -- semantic vector
+  text_sha256       varchar2(64),                                      -- hash of display_text (or full text) for dedupe
+  created_at        timestamp default systimestamp
 )
 partition by range (effective_utc)
 interval (numtoyminterval(1,'month')) (
@@ -94,7 +91,7 @@ interval (numtoyminterval(1,'month')) (
 );
 
 create index fhir_vec.idx_obs_hist_patient on fhir_vec.obs_vec_hist (patient_id) local;
-create index fhir_vec.idx_obs_hist_effective on fhir_vec.obs_vec_hist (effective_start) local;
+create index fhir_vec.idx_obs_hist_effective on fhir_vec.obs_vec_hist (effective_start, effective_end) local;
 
 create index fhir_vec.obs_hist_ctx
   on fhir_vec.obs_vec_hist(display_text)
@@ -113,8 +110,6 @@ create or replace procedure fhir_vec.obs_vec_merge (
   p_value_text        in  varchar2,
   p_display_text      in  clob,
   p_embedding         in  vector, 
-  p_model_name        in  varchar2,
-  p_model_version     in  varchar2,
   p_text_sha256       in  varchar2
 ) as
 begin
@@ -129,8 +124,6 @@ begin
       p_value_text        as value_text,
       p_display_text      as display_text,
       p_embedding         as embedding,
-      p_model_name        as model_name,
-      p_model_version     as model_version,
       p_text_sha256       as text_sha256
     from dual
   ) s
@@ -143,18 +136,14 @@ begin
       a.value_text        = s.value_text,
       a.display_text      = s.display_text,
       a.embedding         = s.embedding,
-      a.model_name        = s.model_name,
-      a.model_version     = s.model_version,
       a.text_sha256       = s.text_sha256
     where a.text_sha256 <> s.text_sha256
   when not matched then insert (
       observation_id, patient_id, effective_start, effective_end,
-      code_text, value_text, display_text, embedding,
-      model_name, model_version, text_sha256
+      code_text, value_text, display_text, embedding, text_sha256
   ) values (
       s.observation_id, s.patient_id, s.effective_start, s.effective_end,
-      s.code_text, s.value_text, s.display_text, s.embedding,
-      s.model_name, s.model_version, s.text_sha256
+      s.code_text, s.value_text, s.display_text, s.embedding, s.text_sha256
   );
 end;
 ```
