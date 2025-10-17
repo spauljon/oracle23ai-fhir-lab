@@ -6,8 +6,8 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/consumer.js",
-    "dev": "tsx watch src/consumer.ts",
+    "start": "node dist/consumer/index.js",
+    "dev": "tsx watch src/consumer/index.ts",
     "clean": "rm -rf dist",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
