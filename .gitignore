@@ -54,3 +54,7 @@ logs
 
 # TypeScript cache
 *.tsbuildinfo
+
+# vitest
+vitest.config.d.*
+vitest.config.js*
