@@ -37,6 +37,22 @@ export class VectorDbHandler extends BaseHandler {
     }
   };
 
+  close = async () => {
+    await this.pool.close();
+  }
+  select = async (sql: string, bindVariables: any): Promise<void> => {
+    await this.pool.execute<void>(async (conn) => {
+      try {
+        const result = await conn.execute(sql, bindVariables, {
+          outFormat: oracledb.OUT_FORMAT_OBJECT,
+        });
+
+        console.table(result.rows);
+      } catch (e: any) {
+        this.log.error(e);
+      }
+    });
+  };
   private readonly deleteRows = async (observationId: string) => {
     await this.pool.execute<void>(async (conn) => {
       try {

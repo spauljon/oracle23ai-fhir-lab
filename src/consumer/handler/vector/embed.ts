@@ -5,11 +5,11 @@ const openai =
     ? null
     : new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-export const embedObservation = async (displayText: string) => {
+export const createEmbedding = async (text: string) => {
   if (openai) {
     const r = await openai.embeddings.create({
       model: 'text-embedding-3-small',
-      input: displayText,
+      input: text,
     });
 
     return r.data[0].embedding;

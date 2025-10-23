@@ -7,7 +7,7 @@ import {
 } from '@consumer/types';
 import { coalesceValues, encodeCodeableConcept, encodeObsValue, } from './encode';
 import { createHash } from 'node:crypto';
-import { embedObservation } from './embed';
+import { createEmbedding } from './embed';
 
 abstract class Transforms {
   protected abstract readonly transforms: Record<string, ColumnTransform>;
@@ -137,7 +137,7 @@ export class MetricTransforms extends Transforms {
         .update(embedInputStr, 'utf8')
         .digest('hex');
 
-      _result.embedding = await embedObservation(embedInputStr);
+      _result.embedding = await createEmbedding(embedInputStr);
 
       this.result.push(_result);
       this.embedInput.push(_embedInput);
