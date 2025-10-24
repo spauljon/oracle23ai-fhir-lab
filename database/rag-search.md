@@ -6,7 +6,7 @@
   repository for one or more patients.
 
 ## RAG Query Patterns
-### Pure vector KNN for a natural-language question
+### 1.  Pure vector KNN for a natural-language question
 To execute a nearest-neighbor (semantic) query like the following, that finds the 10 rows semantically closest to a 
 language expression bound to parameter `q_emb`, we must request an embedding from the openai api (for the same 
 model used during row ingestion).
@@ -162,7 +162,7 @@ is (snipped for brevity):
 }
 ```
 
-### Pure text (Oracle Text) with ranking
+### 2. Pure text (Oracle Text) with ranking
 This example illustrates full text index ranking:
 
 ```sql
@@ -196,3 +196,51 @@ Here are sample results:
 
 Note: BM25 indicates the ranking among the top 25 best matches.
 
+### 3.  Hybrid rank: text + vector
+- Binds both a text query and a vector embedding in the same query
+- Simple linear fusion; can tune weights to suit
+
+Here is a SQL example:
+
+```sql
+with c as (
+  select
+    id, observation_id, patient_id, effective_start, display_text, embedding,
+    score(1) as bm25
+  from obs_vec_active
+  where patient_id = 11331
+    and contains(display_text, :q, 1) > 0
+)
+select
+  id, observation_id, patient_id, effective_start,
+  substr(display_text, 1, 200) as snippet,
+  bm25,
+  vector_distance(embedding, :q_emb) as vdist,
+  (bm25 * 1.0) + ( 10.0 / (1e-6 + vector_distance(embedding, :q_emb)) ) as hybrid_score
+from c
+order by hybrid_score desc
+fetch first 10 rows only;
+```
+Note that the vector embedding bindings require a programming language both to create and submit (it is possible but 
+unwieldy to include a 1536 element vector literal in SQL).
+
+See `query.ts` for a working example.
+
+Here are sample results for `q=housing` and `q_emb='housing insecurity'`:
+```text
+┌─────────┬─────┬────────────────┬────────────┬──────────────────────────┬─────────┬──────┬────────────────────┬────────────────────┐
+│ (index) │ ID  │ OBSERVATION_ID │ PATIENT_ID │ EFFECTIVE_START          │ SNIPPET │ BM25 │ VDIST              │ HYBRID_SCORE       │
+├─────────┼─────┼────────────────┼────────────┼──────────────────────────┼─────────┼──────┼────────────────────┼────────────────────┤
+│ 0       │ 406 │ '12299'        │ '11331'    │ 2022-12-09T14:04:10.000Z │ [Lob]   │ 29   │ 0.6410389001690605 │ 44.599652997204565 │
+│ 1       │ 174 │ '12085'        │ '11331'    │ 2020-11-27T14:12:31.000Z │ [Lob]   │ 29   │ 0.6453058211480411 │ 44.496504410428166 │
+│ 2       │ 61  │ '11833'        │ '11331'    │ 2018-11-16T14:11:01.000Z │ [Lob]   │ 29   │ 0.649239269522923  │ 44.402618213051134 │
+│ 3       │ 644 │ '12475'        │ '11331'    │ 2024-12-20T14:00:19.000Z │ [Lob]   │ 29   │ 0.6508249640662667 │ 44.36509074948615  │
+│ 4       │ 122 │ '12021'        │ '11331'    │ 2019-11-22T14:04:43.000Z │ [Lob]   │ 29   │ 0.6520185902524014 │ 44.33696249238298  │
+│ 5       │ 38  │ '11941'        │ '11331'    │ 2019-03-22T13:54:45.000Z │ [Lob]   │ 29   │ 0.6531227233085246 │ 44.31103471382583  │
+│ 6       │ 351 │ '12212'        │ '11331'    │ 2021-12-03T14:00:26.000Z │ [Lob]   │ 29   │ 0.6551849671575023 │ 44.26284215668506  │
+│ 7       │ 562 │ '12378'        │ '11331'    │ 2023-12-15T14:02:33.000Z │ [Lob]   │ 29   │ 0.6580443193073479 │ 44.196521738846045 │
+│ 8       │ 405 │ '12299'        │ '11331'    │ 2022-12-09T14:04:10.000Z │ [Lob]   │ 29   │ 0.6196651512252378 │ 31.137721868828002 │
+│ 9       │ 350 │ '12212'        │ '11331'    │ 2021-12-03T14:00:26.000Z │ [Lob]   │ 29   │ 0.6234639179253206 │ 31.039394860061414 │
+└─────────┴─────┴────────────────┴────────────┴──────────────────────────┴─────────┴──────┴────────────────────┴────────────────────┘
+
+```
