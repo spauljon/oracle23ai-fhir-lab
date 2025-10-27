@@ -4,7 +4,7 @@ import {
   R4Observation,
   R4ObsValueX,
   VectorColumnType,
-} from '@consumer/types';
+} from '@/types';
 import { coalesceValues, encodeCodeableConcept, encodeObsValue, } from './encode';
 import { createHash } from 'node:crypto';
 import { createEmbedding } from './embed';

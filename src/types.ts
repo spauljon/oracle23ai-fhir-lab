@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { DateTime } from 'luxon';
 
 /** ---------- Common R4 primitives (modeled simply as strings/numbers) ---------- */
 export const R4_id = z.string();
@@ -211,7 +210,6 @@ export type VectorColumnType =
   | string
   | number
   | number[]
-  | DateTime
   | null
   | undefined;
 

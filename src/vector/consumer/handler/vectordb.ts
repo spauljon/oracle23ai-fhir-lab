@@ -1,9 +1,9 @@
-import { BaseHandler } from '@handler/base';
+import { BaseHandler } from '@vector-handler/base';
 import { Logger } from 'pino';
-import { applyTransforms } from '@handler/vector/transforms';
-import { R4Observation, VectorColumnType } from '@consumer/types';
+import { applyTransforms } from '@vector-handler/transforms';
+import { R4Observation, VectorColumnType } from '@/types';
 import oracledb, { BindParameters, Connection } from 'oracledb';
-import { OraclePool, OraclePoolConfig } from '@handler/vector/oraclePool';
+import { OraclePool, OraclePoolConfig } from '@vector-handler/oraclePool';
 
 const poolConfig: OraclePoolConfig = {
   user: process.env.DB_USER!,

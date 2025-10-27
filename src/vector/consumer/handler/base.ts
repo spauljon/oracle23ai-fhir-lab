@@ -4,7 +4,7 @@ import {
   FhirMessageSchema,
   MessageHandler,
   R4_Observation,
-} from '@consumer/types';
+} from '@/types';
 
 /** -----------------------------------------------------------
  * Message handler (Step-1: echo only)

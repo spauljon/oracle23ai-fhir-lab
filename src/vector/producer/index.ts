@@ -1,7 +1,7 @@
 // main.ts
 import { PatientBackfill } from './backfill';
-import { LoggerFactory } from '@consumer/log';
-import { JetStreamService } from '@consumer/jetstream';
+import { LoggerFactory } from '@vector-consumer/log';
+import { JetStreamService } from '@vector-consumer/jetstream';
 import { cfg } from '@/config';
 
 const log = LoggerFactory.create();

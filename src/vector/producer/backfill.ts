@@ -1,5 +1,5 @@
 import { JetStreamClient, JSONCodec } from 'nats';
-import { FhirBundle, FhirMessage, R4Observation } from '@consumer/types';
+import { FhirBundle, FhirMessage, R4Observation } from '@/types';
 
 /**
  * PatientBackfill performs a one-time FHIR search for Observations belonging to

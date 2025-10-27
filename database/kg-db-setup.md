@@ -26,7 +26,7 @@ path parsing in select statements).
 #### Strategy 2: Dedicated Vertex and Edge Objects for Heavy-Use Resource Types, Another Set of Objects For Other Types
 Graph tables can combine resource-specific and general purpose graph tables and views.  
 
-#### Strategy 3: Dedicated Vertex and Edge Objects for All Resource Types
+#### Strategy 3 (Chosen): Dedicated Vertex and Edge Objects for All Resource Types
 This strategy uses specific vertex and edge tables (with appropriate columns) for each resource type.  This provides 
 maximum performance tuning and access flexibility, and avoids JSON parsing overhead.
 

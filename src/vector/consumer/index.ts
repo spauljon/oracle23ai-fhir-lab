@@ -1,8 +1,8 @@
 import 'dotenv/config';
 import { LoggerFactory } from './log';
 import { JetStreamService } from './jetstream';
-import { MessageHandler } from '@consumer/types';
-import { VectorDbHandler } from '@handler/vectordb';
+import { MessageHandler } from '@/types';
+import { VectorDbHandler } from '@vector-handler/vectordb';
 
 const log = LoggerFactory.create();
 
