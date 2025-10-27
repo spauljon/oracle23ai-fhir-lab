@@ -1,4 +1,4 @@
-## Setup Steps
+## Vector DB Setup Steps
 ### Create a Dedicated Vector Tablespace
 ```sql
 create tablespace fhir_vec_ts
