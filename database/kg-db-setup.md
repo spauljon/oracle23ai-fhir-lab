@@ -47,3 +47,141 @@ how variables/labels are defined is different.  ￼
   query capability — but not to replicate every Cypher feature.  ￼
 
 > N.B.  We will write property graphs using standard Oracle DML, and read using PGQL.
+
+## FHIR Schema Definition
+### Create a Dedicated Graph Tablespace
+```sql
+create tablespace fhir_graph_ts
+  datafile 'fhir_graph_ts01.dbf' size 2g autoextend on next 1g maxsize unlimited
+  extent management local segment space management auto;
+```
+
+### Create Graph Schema
+```sql
+create user fhir_graph identified by "fhir_graph"
+  default tablespace fhir_graph_ts
+  temporary tablespace temp
+  quota unlimited on fhir_graph_ts;
+
+grant create session to fhir_graph;
+grant create table, create view, create sequence, create procedure to fhir_graph;
+
+grant ctxapp to fhir_graph;
+
+-- these need to run in sqlplus as sysdba
+grant execute on ctxsys.ctx_ddl to fhir_graph;
+grant execute on ctxsys.ctx_doc     to fhir_graph;
+grant execute on ctxsys.ctx_output  to fhir_graph;
+```
+
+### Create Graph Vertex Schema Objects for FHIR Resource Types
+> N.B.  For each oracle session, default the schema.
+
+```sql
+alter session set current_schema = fhir_graph;
+```
+#### KG Patient
+```sql
+create table kg_patient (
+  patient_id   varchar2(64) primary key,
+  birth_date   date,
+  gender       varchar2(16),
+  first_name   varchar2(25),
+  last_name    varchar2(25)
+)
+partition by hash (patient_id) partitions 16;
+
+create index idx_pat_gender on kg_patient(gender);
+create index idx_patient_name on kg_patient(last_name, first_name);
+```
+
+#### KG Encounter
+```sql
+create table kg_encounter (
+  encounter_id   varchar2(64) primary key,
+  patient_id     varchar2(64) not null,
+  period_start   timestamp,
+  period_end     timestamp,
+  class_code     varchar2(40),
+  type_code      varchar2(80),
+  condition_code varchar2(40)
+)
+partition by range (period_start)
+interval (numtoyminterval(1,'month'))
+subpartition by hash (patient_id) subpartitions 16
+(
+  partition p0 values less than (timestamp '2020-01-01 00:00:00 utc')
+);
+
+create index idx_enc_patient_id   on kg_encounter(patient_id) local;
+create index idx_enc_class on kg_encounter(class_code) local;
+create index idx_enc_cond_code on kg_encounter(condition_code) local;
+```
+
+#### KG Observation
+```sql
+create table kg_observation (
+  id              number generated always as identity primary key,
+  obs_id          varchar2(64),
+  patient_id      varchar2(64) not null,
+  encounter_id    varchar2(64),
+  effective_start timestamp,
+  code            varchar2(80),
+  value_num       number,
+  unit            varchar2(40)
+)
+partition by range (effective_start)
+interval (numtoyminterval(1,'month'))
+subpartition by hash (patient_id) subpartitions 16
+(
+  partition p0 values less than (timestamp '2020-01-01 00:00:00 utc')
+);
+
+create index idx_obs_id on kg_observation(obs_id) local;
+create index idx_obs_patient_id on kg_observation(patient_id) local;
+create index idx_obs_code_ts on kg_observation(code, effective_start) local;
+create index idx_obs_enc on kg_observation(encounter_id) local;
+```
+
+#### KG Condition
+```sql
+create table kg_condition (
+  cond_id       varchar2(64) primary key,
+  patient_id    varchar2(64) not null,
+  code          varchar2(80),
+  clinical_status varchar2(40),
+  onset         timestamp,
+  abatement     timestamp,
+  json          clob
+)
+partition by range (onset)
+interval (numtoyminterval(1,'month'))
+subpartition by hash (patient_id) subpartitions 16
+(
+  partition p0 values less than (timestamp '2020-01-01 00:00:00 utc')
+);
+
+create index idx_cond_patient_id on kg_condition(patient_id) local;
+create index idx_cond_code on kg_condition(code) local;
+```
+
+#### KG Procedure
+```sql
+create table kg_procedure (
+  proc_id        varchar2(64) primary key,
+  patient_id     varchar2(64) not null,
+  encounter_id   varchar2(64),
+  code           varchar2(80),
+  performed_start timestamp,
+  performer_id   varchar2(64)
+)
+partition by range (performed_start)
+interval (numtoyminterval(1,'month'))
+subpartition by hash (patient_id) subpartitions 16
+(
+  partition p0 values less than (timestamp '2020-01-01 00:00:00 utc')
+);
+
+create index idx_proc_patient_id on kg_procedure(patient_id) local;
+create index idx_proc_code on kg_procedure(code) local;
+```
