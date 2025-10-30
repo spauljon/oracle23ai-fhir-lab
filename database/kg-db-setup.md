@@ -1,5 +1,7 @@
 # Knowledge Graph Configuration
 
+# Knowledge Graph Configuration
+
 ## Table of Contents
 - [Oracle Property Graph Schema Strategies](#oracle-property-graph-schema-strategies)
   - [Comparison with Purpose-Built Graph Databases](#comparison-with-purpose-built-graph-databases)
@@ -22,8 +24,9 @@
     - [KG Practitioner](#kg-practitioner)
     - [KG Organization](#kg-organization)
     - [KG Location](#kg-location)
-  - [Create Corresponding Edge Table (to support relationships)](#create-corresponding-edge-table-to-support-relationships)
+  - [Create Edge Tables to Support Property Graph Syntax Requirements](#create-edge-tables-to-support-property-graph-syntax-requirements)
   - [Define the Property Graph](#define-the-property-graph)
+
 
 ## Oracle Property Graph Schema Strategies
 ### Comparison with Purpose-Built Graph Databases
@@ -276,41 +279,6 @@ create table kg_location (
   name        varchar2(400),
   type        varchar2(80)
 );
-```
-
-### Create Corresponding Edge Table (to support relationships)
-
-```sql
-/* =========================
-   UNIFIED EDGE TABLE
-   ========================= */
-
--- Single association table with relationship type, plus pruning helpers
-create table kg_edge (
-  src_label     varchar2(40)  not null,
-  src_id        varchar2(64)  not null,
-  relationship  varchar2(40)  not null,
-  dst_label     varchar2(40)  not null,
-  dst_id        varchar2(64)  not null,
-  patient_id    varchar2(64)  not null,
-  event_ts      timestamp     not null,
-
-  constraint pk_kg_edge
-    primary key (src_label, src_id, relationship, dst_label, dst_id)
-)
-partition by range (event_ts)
-interval (numtoyminterval(1,'month'))
-subpartition by hash (patient_id)
-subpartitions 16
-(
-  partition p_edge_boot values less than (timestamp '2020-01-01 00:00:00 utc')
-);
-
--- local secondary indexes
-create index idx_kg_edge_src     on kg_edge(src_label, src_id)            local;
-create index idx_kg_edge_dst     on kg_edge(dst_label, dst_id)            local;
-create index idx_kg_edge_rel     on kg_edge(relationship)                 local;
-create index idx_kg_edge_pat_rel on kg_edge(patient_id, relationship)     local;
 ```
 
 ### Create Edge Tables to Support Property Graph Syntax Requirements
