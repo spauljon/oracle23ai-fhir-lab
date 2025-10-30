@@ -1,5 +1,30 @@
 # Knowledge Graph Configuration
 
+## Table of Contents
+- [Oracle Property Graph Schema Strategies](#oracle-property-graph-schema-strategies)
+  - [Comparison with Purpose-Built Graph Databases](#comparison-with-purpose-built-graph-databases)
+  - [Oracle Graph Database Object Strategies](#oracle-graph-database-object-strategies)
+    - [Strategy 1: One Set of Objects For All Resource Types](#strategy-1-one-set-of-objects-for-all-resource-types)
+    - [Strategy 2: Dedicated Vertex and Edge Objects for Heavy-Use Resource Types, Another Set of Objects For Other Types](#strategy-2-dedicated-vertex-and-edge-objects-for-heavy-use-resource-types-another-set-of-objects-for-other-types)
+    - [Strategy 3 (Chosen): Dedicated Vertex and Edge Objects for All Resource Types](#strategy-3-chosen-dedicated-vertex-and-edge-objects-for-all-resource-types)
+  - [Oracle Query Language Support](#oracle-query-language-support)
+- [FHIR Schema Definition](#fhir-schema-definition)
+  - [Create a Dedicated Graph Tablespace](#create-a-dedicated-graph-tablespace)
+  - [Create Graph Schema](#create-graph-schema)
+  - [Create Graph Vertex Schema Objects for FHIR Resource Types](#create-graph-vertex-schema-objects-for-fhir-resource-types)
+    - [KG Patient](#kg-patient)
+    - [KG Encounter](#kg-encounter)
+    - [KG Observation](#kg-observation)
+    - [KG Condition](#kg-condition)
+    - [KG Procedure](#kg-procedure)
+    - [KG Medication Request](#kg-medication-request)
+    - [KG Medication Admin](#kg-medication-admin)
+    - [KG Practitioner](#kg-practitioner)
+    - [KG Organization](#kg-organization)
+    - [KG Location](#kg-location)
+  - [Create Corresponding Edge Table (to support relationships)](#create-corresponding-edge-table-to-support-relationships)
+  - [Define the Property Graph](#define-the-property-graph)
+
 ## Oracle Property Graph Schema Strategies
 ### Comparison with Purpose-Built Graph Databases
 Oracle’s Property Graph (and other “RDBMS-hosted” graph engines, like SQL Server Graph, PostgreSQL PGX/AGE, etc.) are graph layers on top of explicit relational storage, while Neo4j (and other native graph databases) are graph-first engines whose underlying persistence model is hidden.
@@ -184,4 +209,267 @@ subpartition by hash (patient_id) subpartitions 16
 
 create index idx_proc_patient_id on kg_procedure(patient_id) local;
 create index idx_proc_code on kg_procedure(code) local;
+```
+
+#### KG Medication Request
+```sql
+create table kg_med_request (
+  mr_id        varchar2(64) primary key,
+  patient_id   varchar2(64) not null,
+  practitioner_id varchar2(64),
+  code         varchar2(80),
+  status       varchar2(40),
+  authored_on  timestamp
+)
+partition by range (authored_on)
+interval (numtoyminterval(1,'month'))
+subpartition by hash (patient_id) subpartitions 16
+(
+  partition p0 values less than (timestamp '2020-01-01 00:00:00 utc')
+);
+
+create index idx_mr_patient_id on kg_med_request(patient_id) local;
+create index idx_mr_code on kg_med_request(code) local;
+```
+
+#### KG Medication Admin
+```sql
+create table kg_med_admin (
+  ma_id         varchar2(64) primary key,
+  patient_id    varchar2(64) not null,
+  practitioner_id varchar2(64),
+  code      varchar2(80),
+  effective_start timestamp
+)
+partition by range (effective_start)
+interval (numtoyminterval(1,'month'))
+subpartition by hash (patient_id) subpartitions 16
+(
+  partition p0 values less than (timestamp '2020-01-01 00:00:00 utc')
+);
+
+create index idx_ma_pid   on kg_med_admin(patient_id) local;
+create index idx_ma_code  on kg_med_admin(code) local;
+```
+
+#### KG Practitioner
+```sql
+create table kg_practitioner (
+  practitioner_id varchar2(64) primary key,
+  name            varchar2(400)
+);
+```
+
+#### KG Organization
+```sql
+create table kg_organization (
+  org_id   varchar2(64) primary key,
+  name     varchar2(400),
+  type     varchar2(80)
+);
+```
+
+#### KG Location
+```sql
+create table kg_location (
+  location_id varchar2(64) primary key,
+  name        varchar2(400),
+  type        varchar2(80)
+);
+```
+
+### Create Corresponding Edge Table (to support relationships)
+
+```sql
+/* =========================
+   UNIFIED EDGE TABLE
+   ========================= */
+
+-- Single association table with relationship type, plus pruning helpers
+create table kg_edge (
+  src_label     varchar2(40)  not null,
+  src_id        varchar2(64)  not null,
+  relationship  varchar2(40)  not null,
+  dst_label     varchar2(40)  not null,
+  dst_id        varchar2(64)  not null,
+  patient_id    varchar2(64)  not null,
+  event_ts      timestamp     not null,
+
+  constraint pk_kg_edge
+    primary key (src_label, src_id, relationship, dst_label, dst_id)
+)
+partition by range (event_ts)
+interval (numtoyminterval(1,'month'))
+subpartition by hash (patient_id)
+subpartitions 16
+(
+  partition p_edge_boot values less than (timestamp '2020-01-01 00:00:00 utc')
+);
+
+-- local secondary indexes
+create index idx_kg_edge_src     on kg_edge(src_label, src_id)            local;
+create index idx_kg_edge_dst     on kg_edge(dst_label, dst_id)            local;
+create index idx_kg_edge_rel     on kg_edge(relationship)                 local;
+create index idx_kg_edge_pat_rel on kg_edge(patient_id, relationship)     local;
+```
+
+### Create Edge Tables to Support Property Graph Syntax Requirements
+```sql
+----------------------------------------------------------------
+-- Patient ──has_observation──> Observation
+----------------------------------------------------------------
+create table e_has_observation (
+  patient_id  varchar2(64) not null,
+  obs_id      varchar2(64) not null,
+  event_ts    timestamp     not null,  -- utc instant (from observation.effective_start)
+  constraint pk_e_has_observation primary key (patient_id, obs_id) using index
+)
+partition by range (event_ts)
+  interval (numtoyminterval(1,'month'))
+subpartition by hash (patient_id) subpartitions 16
+(
+  partition p_boot values less than (timestamp '2020-01-01 00:00:00')
+);
+
+create index x_epho_src on e_has_observation(patient_id) local;
+create index x_epho_dst on e_has_observation(obs_id)     local;
+create index x_epho_pt  on e_has_observation(patient_id, event_ts) local;
+
+----------------------------------------------------------------
+-- Observation ──recorded_during──> Encounter
+----------------------------------------------------------------
+create table e_recorded_during (
+  obs_id        varchar2(64) not null,
+  encounter_id  varchar2(64) not null,
+  patient_id    varchar2(64) not null,
+  event_ts      timestamp     not null,  -- utc (encounter.period_start or obs.effective_start)
+  constraint pk_e_recorded_during primary key (obs_id, encounter_id) using index
+)
+partition by range (event_ts)
+  interval (numtoyminterval(1,'month'))
+subpartition by hash (patient_id) subpartitions 16
+(
+  partition p_boot values less than (timestamp '2020-01-01 00:00:00')
+);
+
+create index x_erd_src on e_recorded_during(obs_id)        local;
+create index x_erd_dst on e_recorded_during(encounter_id)  local;
+create index x_erd_pat on e_recorded_during(patient_id)    local;
+create index x_erd_pt  on e_recorded_during(patient_id, event_ts) local;
+
+----------------------------------------------------------------
+-- Observation ──authored_by──> Practitioner
+----------------------------------------------------------------
+create table e_authored_by (
+  obs_id          varchar2(64) not null,
+  practitioner_id varchar2(64) not null,
+  patient_id      varchar2(64) not null,
+  event_ts        timestamp     not null,  -- utc (observation.effective_start)
+  constraint pk_e_authored_by primary key (obs_id, practitioner_id) using index
+)
+partition by range (event_ts)
+  interval (numtoyminterval(1,'month'))
+subpartition by hash (patient_id) subpartitions 16
+(
+  partition p_boot values less than (timestamp '2020-01-01 00:00:00')
+);
+
+create index x_eab_src on e_authored_by(obs_id)            local;
+create index x_eab_dst on e_authored_by(practitioner_id)   local;
+create index x_eab_pat on e_authored_by(patient_id)        local;
+create index x_eab_pt  on e_authored_by(patient_id, event_ts) local;
+
+----------------------------------------------------------------
+-- Patient ──has_condition──> Condition
+----------------------------------------------------------------
+create table e_has_condition (
+  patient_id varchar2(64) not null,
+  cond_id    varchar2(64) not null,
+  event_ts   timestamp     not null,  -- utc (condition.onset or recordeddate)
+  constraint pk_e_has_condition primary key (patient_id, cond_id) using index
+)
+partition by range (event_ts)
+  interval (numtoyminterval(1,'month'))
+subpartition by hash (patient_id) subpartitions 16
+(
+  partition p_boot values less than (timestamp '2020-01-01 00:00:00')
+);
+
+create index x_ehc_src on e_has_condition(patient_id) local;
+create index x_ehc_dst on e_has_condition(cond_id)    local;
+create index x_ehc_pt  on e_has_condition(patient_id, event_ts) local;
+
+----------------------------------------------------------------
+-- Patient ──had_procedure──> Procedure
+----------------------------------------------------------------
+create table e_had_procedure (
+  patient_id varchar2(64) not null,
+  proc_id    varchar2(64) not null,
+  event_ts   timestamp     not null,  -- utc (procedure.performed_start)
+  constraint pk_e_had_procedure primary key (patient_id, proc_id) using index
+)
+partition by range (event_ts)
+  interval (numtoyminterval(1,'month'))
+subpartition by hash (patient_id) subpartitions 16
+(
+  partition p_boot values less than (timestamp '2020-01-01 00:00:00')
+);
+
+create index x_ehp_src on e_had_procedure(patient_id) local;
+create index x_ehp_dst on e_had_procedure(proc_id)    local;
+create index x_ehp_pt  on e_had_procedure(patient_id, event_ts) local;
+
+```
+
+### Define the Property Graph
+```sql
+create property graph fhir_pg
+  vertex tables (
+    kg_patient           key (patient_id)        label patient,
+    kg_observation       key (obs_id)            label observation,
+    kg_encounter         key (encounter_id)      label encounter,
+    kg_condition         key (cond_id)           label condition,
+    kg_procedure         key (proc_id)           label procedure,
+    kg_med_request       key (mr_id)             label medication_request,
+    kg_med_admin         key (ma_id)             label medication_admin,
+    kg_practitioner      key (practitioner_id)   label practitioner,
+    kg_organization      key (org_id)            label organization,
+    kg_location          key (location_id)       label location
+  )
+  edge tables (
+    e_has_observation
+      key (patient_id, obs_id)
+      source      key (patient_id)  references kg_patient (patient_id)
+      destination key (obs_id)      references kg_observation (obs_id)
+      properties (event_ts)
+      label has_observation,
+
+    e_recorded_during
+      key (obs_id, encounter_id)
+      source      key (obs_id)         references kg_observation (obs_id)
+      destination key (encounter_id)   references kg_encounter   (encounter_id)
+      properties (patient_id, event_ts)
+      label recorded_during,
+
+    e_authored_by
+      key (obs_id, practitioner_id)
+      source      key (obs_id)            references kg_observation (obs_id)
+      destination key (practitioner_id)   references kg_practitioner (practitioner_id)
+      properties (patient_id, event_ts)
+      label authored_by,
+
+    e_has_condition
+      key (patient_id, cond_id)
+      source      key (patient_id)  references kg_patient   (patient_id)
+      destination key (cond_id)     references kg_condition (cond_id)
+      properties (event_ts)
+      label has_condition,
+
+    e_had_procedure
+      key (patient_id, proc_id)
+      source      key (patient_id)  references kg_patient   (patient_id)
+      destination key (proc_id)     references kg_procedure (proc_id)
+      properties (event_ts)
+      label had_procedure
+  );
 ```
