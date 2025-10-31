@@ -1,5 +1,5 @@
 import { VectorDbHandler } from '@vector-handler/vectordb';
-import { LoggerFactory } from '@vector-consumer/log';
+import { LoggerFactory } from '@/log';
 import { createEmbedding } from '@vector-handler/embed';
 import oracledb from 'oracledb';
 

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Logger } from 'pino';
 
 /** ---------- Common R4 primitives (modeled simply as strings/numbers) ---------- */
 export const R4_id = z.string();
@@ -219,14 +220,43 @@ export interface MessageHandler {
   onMessage(data: Uint8Array, meta: { seq: number; subject: string }): Promise<void>;
 }
 
+export const ResourceTypeSchema = z.enum([
+  'Patient',
+  'Observation',
+  'Encounter',
+  'Condition',
+  'Procedure',
+  'MedicationRequest',
+  'MedicationAdministration',
+  'Practitioner',
+  'Location',
+  'Organization',
+]);
+
+export type ResourceType = z.infer<typeof ResourceTypeSchema>;
+
+/**
+ * Base FHIR message envelope for NATS.
+ */
 export const FhirMessageSchema = z.object({
   op: z.enum(['create', 'update', 'delete']),
-  resourceType: z.string(),
-  resource: z.string(),
-  parsed: R4_Observation.optional(),
+  resourceType: ResourceTypeSchema,
+  resource: z.string(),              // raw FHIR JSON string if needed
+  parsed: z.any().optional(),        // typed resource payload (e.g. R4_Observation)
 }).strict();
 
 export type FhirMessage = z.infer<typeof FhirMessageSchema>;
+
+export type HandlerContext = {
+  logger: Logger;
+}
+
+export interface PropertyGraphWriter {
+  /**
+   * Called for messages of the registered resourceType
+   */
+  write(msg: FhirMessage, ctx: HandlerContext): Promise<void>;
+}
 
 export interface FhirBundleLink {
   relation: string;

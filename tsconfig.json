@@ -28,6 +28,8 @@
     "baseUrl": "./src",
     "paths": {
       "@/*": ["*"],
+      "@consumer/*": ["consumer/*"],
+      "@consumer-handler/*": ["consumer/handler/*"],
       "@vector-consumer/*": ["vector/consumer/*"],
       "@vector-handler/*": ["vector/consumer/handler/*"],
       "@test/*": ["test/*"]

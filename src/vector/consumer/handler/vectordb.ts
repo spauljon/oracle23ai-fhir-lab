@@ -1,4 +1,4 @@
-import { BaseHandler } from '@vector-handler/base';
+import { BaseHandler } from '@consumer-handler/base';
 import { Logger } from 'pino';
 import { applyTransforms } from '@vector-handler/transforms';
 import { R4Observation, VectorColumnType } from '@/types';

@@ -1,21 +1,22 @@
-// main.ts
-import { PatientBackfill } from './backfill';
-import { LoggerFactory } from '@/log';
+import { MessageHandler } from '@/types';
 import { JetStreamService } from '@vector-consumer/jetstream';
-import { cfg } from '@/config';
+import { LoggerFactory } from '@/log';
 
 const log = LoggerFactory.create();
 
-class FhirObservationProducer {
+export class FhirMessageConsumer {
   private readonly svc: JetStreamService;
+  private readonly handler: MessageHandler;
 
-  constructor() {
+  constructor(handler: MessageHandler) {
+    this.handler = handler;
     this.svc = new JetStreamService(log);
   }
 
   async run(): Promise<void> {
     await this.svc.connect();
     await this.svc.assertTopology();
+    await this.svc.getConsumer();
 
     const onSignal = async () => {
       await this.svc.shutdown();
@@ -25,19 +26,7 @@ class FhirObservationProducer {
     process.on('SIGINT', onSignal);
     process.on('SIGTERM', onSignal);
 
-    const backfill = new PatientBackfill(
-      this.svc.js,
-      '11331',
-      cfg.fhirBase,
-      cfg.subject,
-      500
-    );
-
-    await backfill.run();
+    await this.svc.startConsuming(this.handler.onMessage);
   }
 }
 
-await new FhirObservationProducer().run().catch(async (err) => {
-  log.error({ err }, 'Fatal error');
-  process.exit(1);
-});
