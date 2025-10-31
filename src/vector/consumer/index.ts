@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { LoggerFactory } from './log';
 import { JetStreamService } from './jetstream';
 import { MessageHandler } from '@/types';
-import { VectorDbHandler } from '@vector-handler/vectordb';
+import { BaseHandler } from '@vector-handler/base';
 
 const log = LoggerFactory.create();
 
@@ -38,7 +38,7 @@ class FhirObservationConsumer {
 /** -----------------------------------------------------------
  * Bootstrap
  * ---------------------------------------------------------- */
-await new FhirObservationConsumer(new VectorDbHandler(log))
+await new FhirObservationConsumer(new BaseHandler(log))
   .run()
   .catch(async (err) => {
     log.error({ err }, 'Fatal error');

@@ -221,7 +221,8 @@ export interface MessageHandler {
 
 export const FhirMessageSchema = z.object({
   op: z.enum(['create', 'update', 'delete']),
-  observation: z.string(),
+  resourceType: z.string(),
+  resource: z.string(),
   parsed: R4_Observation.optional(),
 }).strict();
 

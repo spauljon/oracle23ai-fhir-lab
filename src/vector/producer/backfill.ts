@@ -43,7 +43,8 @@ export class PatientBackfill {
       for (const obs of this.extractObservations(bundle)) {
         const message: FhirMessage = {
           op: 'create',
-          observation: JSON.stringify(obs),
+          resourceType: 'Observation',
+          resource: JSON.stringify(obs),
         }
         await this.js.publish(this.subject, this.jc.encode(message));
         sent++;
