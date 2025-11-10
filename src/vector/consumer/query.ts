@@ -1,6 +1,6 @@
-import { VectorDbHandler } from '@handler/vectordb';
-import { LoggerFactory } from '@consumer/log';
-import { createEmbedding } from '@handler/vector/embed';
+import { VectorDbHandler } from '@vector-handler/vectordb';
+import { LoggerFactory } from 'log';
+import { createEmbedding } from '@vector-handler/embed';
 import oracledb from 'oracledb';
 
 const log = LoggerFactory.create();

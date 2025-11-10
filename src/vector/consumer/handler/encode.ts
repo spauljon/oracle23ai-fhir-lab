@@ -1,13 +1,12 @@
 import {
   R4CodeableConcept,
-  R4ObsValueX,
   R4Period,
   R4Quantity,
   R4Range,
   R4Ratio,
-  VectorColumnType,
-} from '@consumer/types';
-import { DateTime } from 'luxon';
+} from 'fhir/types';
+import { VectorColumnType } from '@vector-handler/types';
+import { R4ObsValueX } from 'fhir/observation';
 
 const encodeQuantity = (q: R4Quantity): string => {
   return [q.value, q.comparator, q.unit, q.system, q.code]
@@ -76,23 +75,8 @@ export const encodeCodeableConcept = (concept: R4CodeableConcept): string => {
     ? `${codings}::${concept.text}`
     : codings || concept?.text || '';
 };
-
-export const coerceDateTimeTz = (datetime: string) => {
-  return DateTime.fromISO(datetime);
-};
-const encodeFulltextValue = (v: VectorColumnType) => {
-  return v instanceof DateTime
-    ? [
-        v.toLocaleString(DateTime.DATETIME_MED),
-        v.toISO(),
-        v.toFormat('yyyy-MM-dd HH:mm'),
-      ].join(' ')
-    : v!.toString();
-};
-
 export const coalesceValues = (result: Record<string, VectorColumnType>) => {
-  return Object.entries(result)
-    .filter(([, v]) => v != null)
-    .map(([, v]) => encodeFulltextValue(v))
+  return Object.values(result)
+    .filter((v) => v != null)
     .join(' ');
 };

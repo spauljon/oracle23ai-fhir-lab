@@ -10,8 +10,8 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": false,
-    "outDir": "./dist",
-    "rootDir": "./src",
+    "outDir": "dist",
+    "rootDir": "src",
     "strict": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
@@ -27,9 +27,10 @@
     "exactOptionalPropertyTypes": true,
     "baseUrl": "./src",
     "paths": {
-      "@/*": ["*"],
       "@consumer/*": ["consumer/*"],
-      "@handler/*": ["consumer/handler/*"],
+      "@consumer-handler/*": ["consumer/handler/*"],
+      "@vector-consumer/*": ["vector/consumer/*"],
+      "@vector-handler/*": ["vector/consumer/handler/*"],
       "@test/*": ["test/*"]
     }
 

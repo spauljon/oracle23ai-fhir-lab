@@ -1,15 +1,10 @@
-import { BaseHandler } from '@handler/base';
+import { BaseHandler } from '@consumer-handler/base';
 import { Logger } from 'pino';
-import { applyTransforms } from '@handler/vector/transforms';
-import { R4Observation, VectorColumnType } from '@consumer/types';
+import { applyTransforms } from '@vector-handler/transforms';
 import oracledb, { BindParameters, Connection } from 'oracledb';
-import { OraclePool, OraclePoolConfig } from '@handler/vector/oraclePool';
-
-const poolConfig: OraclePoolConfig = {
-  user: process.env.DB_USER!,
-  password: process.env.DB_PASS!,
-  connectString: 'localhost:1521/pdbfhirai',
-};
+import { OraclePool } from 'oracle/pool';
+import { VectorColumnType } from '@vector-handler/types';
+import { R4Observation } from 'fhir/observation';
 
 export class VectorDbHandler extends BaseHandler {
   private readonly pool: OraclePool;
@@ -17,7 +12,7 @@ export class VectorDbHandler extends BaseHandler {
   constructor(log: Logger) {
     super(log);
 
-    this.pool = new OraclePool(poolConfig, log);
+    this.pool = new OraclePool(log);
   }
   onMessage = async (
     data: Uint8Array,
@@ -39,7 +34,7 @@ export class VectorDbHandler extends BaseHandler {
 
   close = async () => {
     await this.pool.close();
-  }
+  };
   select = async (sql: string, bindVariables: any): Promise<void> => {
     await this.pool.execute<void>(async (conn) => {
       try {

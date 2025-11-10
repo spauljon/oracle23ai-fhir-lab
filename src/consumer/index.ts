@@ -1,15 +1,10 @@
-import 'dotenv/config';
-import { LoggerFactory } from './log';
-import { JetStreamService } from './jetstream';
-import { MessageHandler } from '@consumer/types';
-import { VectorDbHandler } from '@handler/vectordb';
+import { MessageHandler } from 'types';
+import { JetStreamService } from '@vector-consumer/jetstream';
+import { LoggerFactory } from 'log';
 
 const log = LoggerFactory.create();
 
-/** -----------------------------------------------------------
- * Application orchestrator
- * ---------------------------------------------------------- */
-class FhirObservationConsumer {
+export class FhirMessageConsumer {
   private readonly svc: JetStreamService;
   private readonly handler: MessageHandler;
 
@@ -35,12 +30,3 @@ class FhirObservationConsumer {
   }
 }
 
-/** -----------------------------------------------------------
- * Bootstrap
- * ---------------------------------------------------------- */
-await new FhirObservationConsumer(new VectorDbHandler(log))
-  .run()
-  .catch(async (err) => {
-    log.error({ err }, 'Fatal error');
-    process.exit(1);
-  });

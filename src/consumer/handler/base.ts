@@ -1,10 +1,5 @@
 import type { Logger } from 'pino';
-import {
-  FhirMessage,
-  FhirMessageSchema,
-  MessageHandler,
-  R4_Observation,
-} from '@consumer/types';
+import { FhirMessage, FhirMessageSchema, MessageHandler, } from 'types';
 
 /** -----------------------------------------------------------
  * Message handler (Step-1: echo only)
@@ -30,14 +25,13 @@ export class BaseHandler implements MessageHandler {
     try {
       const message = FhirMessageSchema.parse(JSON.parse(raw));
 
-      message.parsed = R4_Observation.parse(JSON.parse(message.observation));
-
       this.log.debug(
         {
           seq: meta.seq,
           subject: meta.subject,
           operation: message.op,
-          observation: message.parsed,
+          resourceType: message.resourceType,
+          resource: message.resource,
         },
         'NATS message'
       );

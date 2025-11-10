@@ -1,13 +1,11 @@
 import {
-  ColumnTransform,
   R4CodeableConcept,
-  R4Observation,
-  R4ObsValueX,
-  VectorColumnType,
-} from '@consumer/types';
+} from 'fhir/types';
 import { coalesceValues, encodeCodeableConcept, encodeObsValue, } from './encode';
 import { createHash } from 'node:crypto';
 import { createEmbedding } from './embed';
+import { ColumnTransform, VectorColumnType } from '@vector-handler/types';
+import { R4Observation, R4ObsValueX } from 'fhir/observation';
 
 abstract class Transforms {
   protected abstract readonly transforms: Record<string, ColumnTransform>;

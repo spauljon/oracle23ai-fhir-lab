@@ -1,5 +1,21 @@
 import { JetStreamClient, JSONCodec } from 'nats';
-import { FhirBundle, FhirMessage, R4Observation } from '@consumer/types';
+import {  FhirMessage } from 'types';
+import { R4Observation } from 'fhir/observation';
+
+interface FhirBundleLink {
+  relation: string;
+  url: string;
+}
+
+interface FhirBundleEntry {
+  resource?: R4Observation;
+}
+
+export interface FhirBundle {
+  resourceType: "Bundle";
+  entry?: FhirBundleEntry[];
+  link?: FhirBundleLink[];
+}
 
 /**
  * PatientBackfill performs a one-time FHIR search for Observations belonging to
@@ -43,7 +59,8 @@ export class PatientBackfill {
       for (const obs of this.extractObservations(bundle)) {
         const message: FhirMessage = {
           op: 'create',
-          observation: JSON.stringify(obs),
+          resourceType: 'Observation',
+          resource: JSON.stringify(obs),
         }
         await this.js.publish(this.subject, this.jc.encode(message));
         sent++;

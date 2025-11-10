@@ -1,4 +1,4 @@
-## Setup Steps
+## Vector DB Setup Steps
 ### Create a Dedicated Vector Tablespace
 ```sql
 create tablespace fhir_vec_ts
@@ -18,7 +18,7 @@ grant create session to fhir_vec;
 grant create table, create view, create sequence, create procedure to fhir_vec;
 
 grant ctxapp to fhir_vec;
--- these need to run in sqlplus
+-- these need to run in sqlplus as sysdba
 grant execute on ctxsys.ctx_ddl to fhir_vec;
 grant execute on ctxsys.ctx_doc     to fhir_vec;
 grant execute on ctxsys.ctx_output  to fhir_vec;

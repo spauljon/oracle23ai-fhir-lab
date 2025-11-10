@@ -1,6 +1,6 @@
 import { connect, Consumer, ConsumerMessages, JetStreamClient, NatsConnection, } from 'nats';
 import type { Logger } from 'pino';
-import { cfg } from '@/config';
+import { cfg } from 'config';
 
 /** -----------------------------------------------------------
  * JetStream wrapper (connection + consumer lifecycle)

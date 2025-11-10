@@ -6,6 +6,8 @@ export default defineConfig({
     testTimeout: 600000,
     environment: 'node',
     globals: true,
+    silent: false,
+    reporters: ['verbose'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

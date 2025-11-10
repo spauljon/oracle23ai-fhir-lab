@@ -1,25 +1,18 @@
 import oracledb, { Pool, Connection, PoolAttributes } from 'oracledb';
 import { Logger } from 'pino';
+import { LoggerFactory } from 'log';
 
-export interface OraclePoolConfig {
-  user: string;
-  password: string;
-  connectString: string;
-  poolMin?: number;
-  poolMax?: number;
-  poolIncrement?: number;
-  poolTimeout?: number;
-  queueTimeout?: number;
-}
+const _poolConfig = {
+  user: process.env.DB_USER!,
+  password: process.env.DB_PASS!,
+  connectString: 'localhost:1521/pdbfhirai',
+};
 
 export class OraclePool {
   private pool?: Pool;
   private isShuttingDown = false;
 
-  constructor(
-    private readonly config: OraclePoolConfig,
-    private readonly log: Logger
-  ) {}
+  constructor(private readonly log: Logger) {}
 
   async initialize(): Promise<void> {
     if (this.pool) {
@@ -29,14 +22,9 @@ export class OraclePool {
 
     try {
       const poolConfig: PoolAttributes = {
-        user: this.config.user,
-        password: this.config.password,
-        connectString: this.config.connectString,
-        poolMin: this.config.poolMin ?? 2,
-        poolMax: this.config.poolMax ?? 10,
-        poolIncrement: this.config.poolIncrement ?? 1,
-        poolTimeout: this.config.poolTimeout ?? 60,
-        queueTimeout: this.config.queueTimeout ?? 60000,
+        user: _poolConfig.user,
+        password: _poolConfig.password,
+        connectString: _poolConfig.connectString,
       };
 
       this.pool = await oracledb.createPool(poolConfig);
@@ -45,7 +33,7 @@ export class OraclePool {
         {
           poolMin: poolConfig.poolMin,
           poolMax: poolConfig.poolMax,
-          connectString: this.config.connectString,
+          connectString: _poolConfig.connectString,
         },
         'Oracle connection pool created'
       );
@@ -131,3 +119,7 @@ export class OraclePool {
     process.on('beforeExit', () => shutdown('beforeExit'));
   }
 }
+
+const log = LoggerFactory.create();
+
+export const sharedPool = new OraclePool(log);
