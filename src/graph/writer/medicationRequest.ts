@@ -13,6 +13,7 @@ type MedicationRequestRow = {
   patient_id: string | null;
   practitioner_id?: string | null | undefined;
   code?: string | null | undefined;
+  display?: string | null | undefined;
   status?: string | null | undefined;
   authored_on?: Date | null | undefined;
 };
@@ -33,11 +34,13 @@ export class MedicationRequestWriter extends BaseWriter<R4MedicationRequest> {
     medRequest: R4MedicationRequest,
     ctx: HandlerContext
   ): Promise<void> {
+    const coding = medRequest.medicationCodeableConcept?.coding?.[0];
     const row: MedicationRequestRow = {
       mr_id: medRequest.id!,
       patient_id: extractId(medRequest.subject),
       practitioner_id: extractId(medRequest.requester),
-      code: medRequest.medicationCodeableConcept?.coding?.[0].code,
+      code: coding?.code,
+      display: coding?.display,
       status: medRequest.status,
       authored_on: validDate(medRequest.authoredOn)
     };

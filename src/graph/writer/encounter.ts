@@ -11,11 +11,16 @@ export class EncounterWriter extends BaseWriter<R4Encounter> {
   }
 
   async delete(encounter: R4Encounter, ctx: HandlerContext): Promise<number> {
-    return await this.deleteVertexRows('encounter_id = :id', { id: encounter.id }, ctx);
+    return await this.deleteVertexRows(
+      'encounter_id = :id',
+      { id: encounter.id },
+      ctx
+    );
   }
 
   async merge(encounter: R4Encounter, ctx: HandlerContext): Promise<void> {
     const period = encounter.period;
+    const typeCoding = encounter.type?.[0]?.coding?.[0];
     return await this.mergeVertexRow(
       ['encounter_id'],
       {
@@ -24,7 +29,9 @@ export class EncounterWriter extends BaseWriter<R4Encounter> {
         period_start: validDate(period?.start) ?? null,
         period_end: validDate(period?.end) ?? null,
         class_code: encounter.class?.code ?? null,
-        type_code: encounter.type?.[0]?.coding?.[0]?.code ?? null
+        class_display: encounter.class?.display ?? null,
+        type_code: typeCoding?.code ?? null,
+        type_display: typeCoding?.display ?? null,
       },
       ctx
     );

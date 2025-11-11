@@ -5,6 +5,7 @@ import { R4_Observation, R4Observation } from 'fhir/observation';
 import { extractId, extractType } from 'fhir/reference';
 import { effectiveDate } from 'date';
 import { isDefined } from 'system';
+import { R4Coding, R4Quantity } from '../../fhir/types';
 
 type ObservationRow = {
   obs_id: string;
@@ -12,6 +13,7 @@ type ObservationRow = {
   encounter_id: string | null;
   effective_start: Date | null;
   code?: string | null | undefined;
+  display?: string | null | undefined;
   value_num?: number | null | undefined;
   unit?: string | null;
 };
@@ -96,23 +98,32 @@ export class ObservationWriter extends BaseWriter<R4Observation> {
 
     if (isDefined(observation.valueQuantity)) {
       const quant = observation.valueQuantity;
-      row.code = quant.code ?? null;
-      row.value_num = quant.value ?? null;
-      row.unit = quant.unit ?? null;
+      const coding = observation.code?.coding?.[0];
 
+      this.completeRow(row, coding, quant);
       yield row;
     }
     for (const comp of observation.component ?? []) {
-      const quant = comp.valueQuantity;
+      if (isDefined(comp.valueQuantity)) {
+        const quant = comp.valueQuantity;
+        const coding = comp.code?.coding?.[0];
 
-      if (quant) {
-        row.code = comp.code?.coding?.[0]?.code ?? null;
-        row.value_num = quant?.value ?? null;
-        row.unit = quant?.unit ?? null;
+        this.completeRow(row, coding, quant);
 
         yield row;
       }
     }
+  }
+
+  private completeRow(
+    row: ObservationRow,
+    coding?: R4Coding,
+    quantity?: R4Quantity
+  ) {
+    row.code = coding?.code ?? null;
+    row.display = coding?.display ?? null;
+    row.value_num = quantity?.value ?? null;
+    row.unit = quantity?.unit ?? null;
   }
 
   private async deleteEdgeRows(

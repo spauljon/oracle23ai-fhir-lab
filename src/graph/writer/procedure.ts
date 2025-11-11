@@ -10,6 +10,7 @@ type ProcedureRow = {
   patient_id: string | null;
   encounter_id: string | null;
   code?: string | null | undefined;
+  display?: string | null | undefined;
   performed_start?: Date | null;
   performer_id: string | null;
 };
@@ -30,11 +31,13 @@ export class ProcedureWriter extends BaseWriter<R4Procedure> {
   }
 
   async merge(procedure: R4Procedure, ctx: HandlerContext): Promise<void> {
+    const coding = procedure.code?.coding?.[0];
     const row: ProcedureRow = {
       proc_id: procedure.id!,
       patient_id: extractId(procedure.subject),
       encounter_id: extractId(procedure.encounter),
-      code: procedure.code?.coding?.[0].code ?? null,
+      code: coding?.code ?? null,
+      display: coding?.display ?? null,
       performed_start: validDate(
         procedure.performedDateTime ?? procedure.performedPeriod?.start
       ),

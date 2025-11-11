@@ -9,6 +9,7 @@ type ConditionRow = {
   cond_id: string;
   patient_id: string | null;
   code?: string | null | undefined;
+  display?: string | null | undefined;
   clinical_status?: string | null | undefined;
   onset?: Date | null;
   abatement?: Date | null;
@@ -30,10 +31,12 @@ export class ConditionWriter extends BaseWriter<R4Condition> {
   }
 
   async merge(condition: R4Condition, ctx: HandlerContext): Promise<void> {
+    const coding = condition.code?.coding?.[0];
     const row: ConditionRow = {
       cond_id: condition.id!,
       patient_id: extractId(condition.subject),
-      code: condition.code?.coding?.[0].code ?? null,
+      code: coding?.code ?? null,
+      display: coding?.display ?? null,
       clinical_status: condition.clinicalStatus?.coding?.[0].code ?? null,
       onset: validDate(condition.onsetDateTime ?? condition.onsetPeriod?.start),
       abatement: validDate(

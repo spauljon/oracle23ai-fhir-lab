@@ -41,6 +41,8 @@ export const R4_Coding = z
   })
   .strict();
 
+export type R4Coding = z.infer<typeof R4_Coding>;
+
 export const R4_CodeableConcept = z
   .object({
     coding: z.array(R4_Coding).optional(),

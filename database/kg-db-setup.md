@@ -131,14 +131,15 @@ create table kg_encounter (
   period_start   timestamp,
   period_end     timestamp,
   class_code     varchar2(40),
+  class_display  varchar2(200),
   type_code      varchar2(80),
-  condition_code varchar2(40)
+  type_display   varchar2(200)
 )
 partition by hash (patient_id) partitions 16;
 
 create index idx_enc_patient_id   on kg_encounter(patient_id) local;
 create index idx_enc_class on kg_encounter(class_code) local;
-create index idx_enc_cond_code on kg_encounter(condition_code) local;
+create index idx_enc_type_code on kg_encounter(type_code) local;
 ```
 
 #### KG Observation
@@ -150,6 +151,7 @@ create table kg_observation (
   encounter_id    varchar2(64),
   effective_start timestamp,
   code            varchar2(80),
+  display         varchar2(200),
   value_num       number,
   unit            varchar2(40)
 )
@@ -167,6 +169,7 @@ create table kg_condition (
   cond_id       varchar2(64) primary key,
   patient_id    varchar2(64) not null,
   code          varchar2(80),
+  display       varchar2(200),
   clinical_status varchar2(40),
   onset         timestamp,
   abatement     timestamp
@@ -184,6 +187,7 @@ create table kg_procedure (
   patient_id     varchar2(64) not null,
   encounter_id   varchar2(64),
   code           varchar2(80),
+  display        varchar2(200),
   performed_start timestamp,
   performer_id   varchar2(64)
 )
@@ -200,6 +204,7 @@ create table kg_med_request (
   patient_id   varchar2(64) not null,
   practitioner_id varchar2(64),
   code         varchar2(80),
+  display      varchar2(200),
   status       varchar2(40),
   authored_on  timestamp
 )
@@ -215,7 +220,8 @@ create table kg_med_admin (
   ma_id         varchar2(64) primary key,
   patient_id    varchar2(64) not null,
   practitioner_id varchar2(64),
-  code      varchar2(80),
+  code          varchar2(80),
+  display       varchar2(200),
   effective_start timestamp
 )
 partition by hash (patient_id) partitions 16;
@@ -372,4 +378,9 @@ create property graph fhir_pg
       destination key (proc_id)     references kg_procedure (proc_id)
       label had_procedure
   );
+```
+### Convenience Scripts
+#### Truncate the Schema
+```shell
+grep 'create table ' kg-db-setup.md | awk '{ printf("truncate table %s;\n", $3)}'
 ```

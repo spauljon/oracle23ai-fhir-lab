@@ -13,6 +13,7 @@ type MedicationAdministrationRow = {
   patient_id: string | null;
   practitioner_id?: string | null | undefined;
   code?: string | null | undefined;
+  display?: string | null | undefined;
   effective_start: Date | null | undefined;
 };
 
@@ -37,11 +38,13 @@ export class MedicationAdministrationWriter extends BaseWriter<R4MedicationAdmin
     medAdmin: R4MedicationAdministration,
     ctx: HandlerContext
   ): Promise<void> {
+    const coding = medAdmin.medicationCodeableConcept?.coding?.[0];
     const row: MedicationAdministrationRow = {
       ma_id: medAdmin.id!,
       patient_id: extractId(medAdmin.subject),
       practitioner_id: extractId(medAdmin.performer?.[0]?.actor),
-      code: medAdmin.medicationCodeableConcept?.coding?.[0].code,
+      code: coding?.code,
+      display: coding?.display,
       effective_start: validDate(
         medAdmin.effectiveDateTime ?? medAdmin.effectivePeriod?.start
       ),

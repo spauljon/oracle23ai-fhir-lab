@@ -1,4 +1,4 @@
-# RAG Search Capabilities
+# RAG Vector Search Capabilities
 ## Prerequisites
 - FHIR Service must be deployed locally and provisioned with a reasonable synthea population.
 - Oracle 23ai database must have a vector schema as detailed in `db-setup.md`.
